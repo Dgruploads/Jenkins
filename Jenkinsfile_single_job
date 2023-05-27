@@ -1,0 +1,47 @@
+pipeline {
+  agent any
+
+  stages {
+    stage ("Build the maven war package") {
+      steps {
+        node ("build_server") {
+          
+          //Checkout the SCM
+          print ("Downloading the source code from GitHub")
+          checkout scmGit(
+            branches: [[name: '*/maven_branch']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/Dgruploads/intellipaat-demo.git']]
+          )
+          
+          //Delete and create a new war package
+          print ("Delete the old maven package")
+          print ("Creating new maven package")
+          sh "mvn clean install"
+
+          //Stash the war apackage
+          print ("Preparing the war package to copy to the deploy server")
+          dir("/home/ubuntu/build_server/workspace/single_job_pipeline/target/") {
+            //stash( includes:"/home/ubuntu/build_server/workspace/single_job_pipeline/target/hello-world-webapp.war", name: "package_maven")
+            stash( includes:"hello-world-webapp.war", name: "package_maven")
+          }
+        }
+      }
+    }
+    
+    stage ("Deploy the maven package") {
+      steps {
+        node ("deploy_server") {
+          //Delete the old maven package
+          print ("Deleting the old maven package")
+          sh "rm -rf /home/ubuntu/tomcat/webapps/hello-world-webapp.war"
+          
+          //Unstash the maven package
+          print ("Setting the directory to webapps")
+          dir("/home/ubuntu/tomcat/webapps") {
+            print ("Getting the package from the build server")
+            unstash( name: "package_maven")
+          }
+        }
+      } 
+    } 
+  }
+}
